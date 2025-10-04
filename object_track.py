@@ -1,3 +1,14 @@
+## How to Run
+#1. Download the video as "YOUR_VIDEO_FILENAME.mp4" or just use the name in github.
+#2. Create and activate your Python venv:
+  #  - Linux/macOS/WSL: `python3 -m venv venv && source venv/bin/activate`
+ #   - Windows: `python -m venv venv && venv\Scripts\activate`
+#3. Install dependencies:
+ #   - `pip install numpy opencv-python`
+#4. Edit the code to set your video filename in `cap = cv2.VideoCapture(...)`.
+#5. Run the code:
+ #   - `python object_track.py`
+#PS i did this on linux.
 import cv2
 import numpy as np
 
