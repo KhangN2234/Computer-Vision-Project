@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Baseball Tracker</title>
+</head>
+<body style="text-align:center; font-family:sans-serif;">
+    <h1>⚾ Baseball Tracker</h1>
+    <form action="/" method="POST" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/mp4" required>
+        <button type="submit">Upload and Process</button>
+    </form>
+
+    {% if processed_video %}
+    <h2>Processed Video:</h2>
+    <video width="640" height="360" controls>
+        <source src="{{ processed_video }}" type="video/mp4">
+    </video>
+    {% endif %}
+</body>
+</html>
