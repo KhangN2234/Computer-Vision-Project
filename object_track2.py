@@ -14,7 +14,7 @@ def process_video(input_path, output_path):
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
-        print(f"❌ Could not open video: {input_path}")
+        print(f"Could not open video: {input_path}")
         return
 
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -28,7 +28,7 @@ def process_video(input_path, output_path):
     cv2.namedWindow("Baseball Tracking", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Baseball Tracking", 960, 540)
 
-    print("🚀 Tracking baseball... Press 'q' to quit early.")
+    print("Tracking baseball... Press 'q' to quit early.")
 
     while True:
         ret, frame = cap.read()
@@ -62,7 +62,7 @@ def process_video(input_path, output_path):
         # Show live tracking
         cv2.imshow("Baseball Tracking", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            print("⏹️ Tracking stopped by user")
+            print("Tracking stopped by user")
             break
 
     cap.release()
