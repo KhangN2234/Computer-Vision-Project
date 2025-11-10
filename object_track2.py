@@ -26,14 +26,16 @@ def process_video(input_path, output_path):
     cv2.namedWindow("Frame Selection", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Frame Selection", 960, 540)
 
-    def select_frame(message):
-        frame_index = 0
+    
+    def select_frame(message, frame_index):
         while True:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             ret, frame = cap.read()
             if not ret:
                 break
             display = frame.copy()
+            cv2.putText(display, "Use A/D to navigate, SPACE to confirm, Q to quit.", 
+                (10,100), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255,255,255),2)
             cv2.putText(display, f"{message} | Frame: {frame_index}/{total_frames}",
                         (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             cv2.imshow("Frame Selection", display)
@@ -49,11 +51,10 @@ def process_video(input_path, output_path):
                 print("Selection cancelled by user.")
                 return None
 
-    print("Use A/D to navigate frames, SPACE to confirm selection.")
-    start_frame = select_frame("Select frame where ball is THROWN")
+    start_frame = select_frame("Select frame where ball is THROWN", 0)
     if start_frame is None:
         return
-    end_frame = select_frame("Select frame where ball is CAUGHT or HIT")
+    end_frame = select_frame("Select frame where ball is CAUGHT or HIT", start_frame + 1)
     if end_frame is None:
         return
     cv2.destroyWindow("Frame Selection")
@@ -65,10 +66,10 @@ def process_video(input_path, output_path):
         print("Could not read selected start frame.")
         return
 
-    cv2.namedWindow("Select ROI", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Select ROI", 960, 540)
-    roi = cv2.selectROI("Select ROI", first_frame, showCrosshair=True, fromCenter=False)
-    cv2.destroyWindow("Select ROI")
+    cv2.namedWindow("Select Area to Detect", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Select Area to Detect", 960, 540)
+    roi = cv2.selectROI("Select Area to Detect", first_frame, showCrosshair=True, fromCenter=False)
+    cv2.destroyWindow("Select Area to Detect")
 
     x_roi, y_roi, w_roi, h_roi = roi
     print(f"ROI selected: x={x_roi}, y={y_roi}, w={w_roi}, h={h_roi}")
@@ -104,10 +105,9 @@ def process_video(input_path, output_path):
     # ---------- STEP 4: Interpolate missing detections ----------
     df = pd.DataFrame(data, columns=["frame", "x", "y"])
     df[["x", "y"]] = df[["x", "y"]].interpolate(method='linear')
-    df[["x", "y"]] = df[["x", "y"]].fillna(method="bfill").fillna(method="ffill")
+    df[["x", "y"]] = df[["x", "y"]].bfill().ffill()
 
     # ---------- STEP 5: Playback ----------
-    print("Press A/D to move frames, SPACE to toggle play/pause, Q to quit.")
     cv2.namedWindow("Baseball Tracking", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Baseball Tracking", 960, 540)
 
@@ -129,7 +129,7 @@ def process_video(input_path, output_path):
         if frame_index in df["frame"].values:
             idx = df.index[df["frame"] == frame_index][0]
             cx, cy = int(df.loc[idx, "x"]), int(df.loc[idx, "y"])
-            cv2.circle(display, (cx, cy), 6, (0, 0, 255), -1)
+            #cv2.circle(display, (cx, cy), 6, (0, 0, 255), -1)
 
             # Draw trajectory up to current frame
             for j in range(1, idx + 1):
