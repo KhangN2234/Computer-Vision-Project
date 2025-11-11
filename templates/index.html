@@ -38,25 +38,19 @@
                     <label for="video" style="display: block; margin-bottom: 10px; font-weight: bold;">Select Video File:</label>
                     <input type="file" name="video" id="video" accept="video/*" required>
                 </div>
+                <label for="distance">Distance between pitcher and catcher (meters):</label>
+                <input type="number" step="0.01" name="distance" placeholder="18.44" required>
                 <button type="submit" id="submitBtn">Upload and Process Video</button>
             </form>
         </div>
 
         {% if processed_video %}
         <div class="video-section">
-            <h2 style="margin-bottom: 20px; color: #333;">Processed Video with Baseball Tracking:</h2>
-            <div class="video-container">
-                <video id="processedVideo" width="640" controls preload="auto" playsinline>
-                    <source src="{{ url_for('static', filename=processed_video) }}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-                <div id="videoError" style="display:none; color:red; margin-top:10px;"></div>
-            </div>
-            <p style="margin-top: 10px;">
                 <a href="{{ url_for('static', filename=processed_video) }}" 
                 download style="background: #28a745; 
                 color: white; 
-                padding: 10px 20px; 
+                padding: 10px 20px;
+                margin-left: 32%; 
                 text-decoration: none; 
                 border-radius: 5px; 
                 display: inline-block;">
