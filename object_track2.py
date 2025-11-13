@@ -2,78 +2,9 @@ from ultralytics import YOLO
 import cv2
 import pandas as pd
 import numpy as np
+import compute_and_save_speeds
+from perspective_calibration import calibrate_distance_from_video
 
-import numpy as np
-import pandas as pd
-
-def compute_and_save_speeds(df, fps, start_frame, end_frame, real_distance_meters, csv_outpath=None, smooth_window=3):
-    """
-    df: DataFrame with columns ['frame','x','y'] for frames start_frame..end_frame (interpolated)
-    fps: frames per second (int)
-    start_frame, end_frame: int frame indices used for scale mapping
-    real_distance_meters: real-world distance between pitcher and catcher/hitter (float, meters)
-    csv_outpath: optional path to save speeds CSV
-    smooth_window: odd integer for rolling smoothing of instantaneous speeds (frames)
-    Returns: df_speeds (DataFrame) with columns ['frame','x','y','dp_pixels','dm_m','speed_m_s','speed_mph','speed_m_s_smooth']
-    """
-
-    # Subset df to requested range and make sure it's sorted by frame
-    df_seg = df[(df['frame'] >= start_frame) & (df['frame'] <= end_frame)].reset_index(drop=True).copy()
-    if df_seg.empty:
-        raise ValueError("No frames in requested range.")
-
-    # 1) compute pixel distance between start and end frames for scaling
-    start_row = df_seg[df_seg['frame'] == start_frame].iloc[0]
-    end_row = df_seg[df_seg['frame'] == end_frame].iloc[0]
-    px_dist = float(np.hypot(end_row['x'] - start_row['x'], end_row['y'] - start_row['y']))
-    if px_dist <= 0:
-        raise ValueError("Pixel distance between start and end frames is zero or invalid. Cannot compute scale.")
-
-    meters_per_pixel = real_distance_meters / px_dist
-
-    # 2) compute per-frame pixel displacement and convert to meters and speed
-    dp_pixels = [np.nan]  # first frame has no previous
-    for i in range(1, len(df_seg)):
-        dx = df_seg.loc[i, 'x'] - df_seg.loc[i-1, 'x']
-        dy = df_seg.loc[i, 'y'] - df_seg.loc[i-1, 'y']
-        dp_pixels.append(float(np.hypot(dx, dy)))
-
-    df_seg['dp_pixels'] = dp_pixels
-    df_seg['dm_m'] = df_seg['dp_pixels'] * meters_per_pixel         # meters moved between frames
-    df_seg['speed_m_s'] = df_seg['dm_m'] * fps                     # meters per second
-    df_seg['speed_mph'] = df_seg['speed_m_s'] * 2.2369362920544    # convert to mph
-
-    # 3) smoothing (optional)
-    if smooth_window is not None and smooth_window > 1:
-        df_seg['speed_m_s_smooth'] = df_seg['speed_m_s'].rolling(window=smooth_window, min_periods=1, center=True).mean()
-        df_seg['speed_mph_smooth'] = df_seg['speed_mph'].rolling(window=smooth_window, min_periods=1, center=True).mean()
-    else:
-        df_seg['speed_m_s_smooth'] = df_seg['speed_m_s']
-        df_seg['speed_mph_smooth'] = df_seg['speed_mph']
-
-    # 4) summary
-    valid_speeds = df_seg['speed_m_s'].dropna()
-    if not valid_speeds.empty:
-        avg_m_s = float(valid_speeds.mean())
-        max_m_s = float(valid_speeds.max())
-        avg_mph = avg_m_s * 2.2369362920544
-        max_mph = max_m_s * 2.2369362920544
-    else:
-        avg_m_s = max_m_s = avg_mph = max_mph = np.nan
-
-    summary = {
-        'meters_per_pixel': meters_per_pixel,
-        'avg_speed_m_s': avg_m_s,
-        'max_speed_m_s': max_m_s,
-        'avg_speed_mph': avg_mph,
-        'max_speed_mph': max_mph
-    }
-
-    # 5) save CSV if requested
-    if csv_outpath:
-        df_seg.to_csv(csv_outpath, index=False)
-
-    return df_seg, summary
 
 
 def process_video(input_path, output_path, real_distance_meters):
@@ -108,7 +39,7 @@ def process_video(input_path, output_path, real_distance_meters):
                 break
             display = frame.copy()
             cv2.putText(display, "Use A/D to navigate, SPACE to confirm, Q to quit.",
-                (10,100), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255,255,255),2)
+                (30,100), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255,255,255),2)
             cv2.putText(display, f"{message} | Frame: {frame_index}/{total_frames}",
                         (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             cv2.imshow("Frame Selection", display)
@@ -147,6 +78,9 @@ def process_video(input_path, output_path, real_distance_meters):
     x_roi, y_roi, w_roi, h_roi = roi
     print(f"ROI selected: x={x_roi}, y={y_roi}, w={w_roi}, h={h_roi}")
 
+        # ---------- STEP 2.5: Perspective Calibration ----------
+    meters_per_pixel = calibrate_distance_from_video(input_path, real_distance_meters)
+
     # ---------- STEP 3: YOLO Detection ----------
     data = []
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
@@ -180,20 +114,26 @@ def process_video(input_path, output_path, real_distance_meters):
 
     # ---------- STEP 5: Compute ball speeds ----------
     try:
-        df_speed, summary = compute_and_save_speeds(
+        df_speed, summary = compute_and_save_speeds.compute_and_save_speeds(
             df=df,
             fps=fps,
             start_frame=start_frame,
             end_frame=end_frame,
-            real_distance_meters=real_distance_meters,
+            meters_per_pixel=meters_per_pixel,  # <-- use calibration result
             csv_outpath=output_path.replace(".mp4", "_speeds.csv")
         )
+
         df_speed = df_speed.set_index("frame")
-        print(f"\nAverage Speed: {summary['avg_speed_mph']:.2f} mph")
-        print(f"Max Speed: {summary['max_speed_mph']:.2f} mph")
+
+        print("\n--- Speed Summary ---")
+        print(f"Meters per pixel: {summary['meters_per_pixel']:.6f}")
+        print(f"Average speed: {summary['avg_speed_mph']:.2f} mph ({summary['avg_speed_m_s']:.2f} m/s)")
+        print(f"Max speed: {summary['max_speed_mph']:.2f} mph ({summary['max_speed_m_s']:.2f} m/s)")
+
     except Exception as e:
         print(f"Speed calculation skipped: {e}")
         df_speed, summary = df, None
+
 
     # ---------- STEP 6: Playback with speed overlay ----------
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
