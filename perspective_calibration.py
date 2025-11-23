@@ -3,7 +3,7 @@ import numpy as np
 
 def calibrate_distance_from_video(input_path, real_distance_meters=18.44):
     """
-    Allows user to draw a calibration line (pitcher -> batter) on the first frame.
+    Allows user to draw a calibration line (pitcher to batter) on the first frame.
     Returns meters per pixel ratio for real-world distance conversion.
     """
     cap = cv2.VideoCapture(input_path)
